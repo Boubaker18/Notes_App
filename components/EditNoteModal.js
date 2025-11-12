@@ -1,31 +1,30 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
   Modal,
+  View,
   TextInput,
+  StyleSheet,
+  Text,
   TouchableOpacity,
 } from "react-native";
-import { createNote } from "../services/note-service";
+import { updateNote } from "../services/note-service";
 
-export default function NoteInput({
-  visible,
-  onClose,
-  onSave,
-  noteText,
-  setNoteText,
-  isEditing,
-}) {
+const EditNoteModal = ({ visible, onClose, onNoteUpdated, note }) => {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Initialize form with note data when it changes
+  useEffect(() => {
+    if (note) {
+      setTitle(note.title || "");
+      setContent(note.content || "");
+    }
+  }, [note]);
+
   // Reset form state
   const resetForm = () => {
-    setTitle("");
-    setContent("");
     setError(null);
   };
 
@@ -35,7 +34,7 @@ export default function NoteInput({
     onClose();
   };
 
-  // Save the new note
+  // Save the updated note
   const handleSave = async () => {
     // Basic form validation
     if (!title.trim() || !content.trim()) {
@@ -47,64 +46,66 @@ export default function NoteInput({
       setLoading(true);
       setError(null);
 
-      // Prepare note data
-      const noteData = {
+      // Prepare update data
+      const updateData = {
         title: title.trim(),
         content: content.trim(),
-        userId: "demo-user", // Temporary userId, will be replaced with auth
       };
 
-      // Call create note service
-      const newNote = await createNote(noteData);
+      // Call update note service
+      const updatedNote = await updateNote(note.$id, updateData);
 
       // Reset form and close modal
       resetForm();
       onClose();
 
-      // Notify parent component about the new note
-      if (onSave) {
-        onSave(newNote);
+      // Notify parent component about the updated note
+      if (onNoteUpdated) {
+        onNoteUpdated(updatedNote);
       }
     } catch (err) {
-      console.error("Error creating note:", err);
-      setError("Failed to save note. Please try again.");
+      console.error("Error updating note:", err);
+      setError("Failed to update note. Please try again.");
     } finally {
       setLoading(false);
     }
   };
+
+  // Don't render if no note is provided
+  if (!note) return null;
+
   return (
     <Modal
+      visible={visible}
       animationType="slide"
       transparent={true}
-      visible={visible}
       onRequestClose={handleClose}
     >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Add New Note</Text>
+      <View style={styles.centeredView}>
+        <View style={styles.modalView}>
+          <Text style={styles.modalTitle}>Edit Note</Text>
 
           {error && <Text style={styles.errorText}>{error}</Text>}
 
           <TextInput
-            style={styles.textInput}
+            style={styles.input}
             placeholder="Title"
             value={title}
             onChangeText={setTitle}
-            autoFocus
           />
 
           <TextInput
-            style={[styles.textInput, styles.contentInput]}
-            placeholder="Enter your note content here..."
+            style={[styles.input, styles.contentInput]}
+            placeholder="Content"
             value={content}
             onChangeText={setContent}
-            multiline
+            multiline={true}
             textAlignVertical="top"
           />
 
-          <View style={styles.modalButtons}>
+          <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton]}
+              style={[styles.button, styles.cancelButton]}
               onPress={handleClose}
               disabled={loading}
             >
@@ -112,12 +113,12 @@ export default function NoteInput({
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.modalButton, styles.saveButton]}
+              style={[styles.button, styles.saveButton]}
               onPress={handleSave}
               disabled={loading}
             >
               <Text style={styles.buttonText}>
-                {loading ? "Saving..." : "Save Note"}
+                {loading ? "Saving..." : "Save Changes"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -125,57 +126,61 @@ export default function NoteInput({
       </View>
     </Modal>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  centeredView: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
-  modalContent: {
-    width: "80%",
+  modalView: {
+    width: "90%",
     backgroundColor: "white",
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowRadius: 4,
     elevation: 5,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 15,
+    marginBottom: 16,
+    textAlign: "center",
   },
-  textInput: {
+  input: {
     borderWidth: 1,
     borderColor: "#ddd",
-    borderRadius: 6,
+    borderRadius: 5,
     padding: 10,
-    marginBottom: 20,
+    marginBottom: 15,
   },
   contentInput: {
     height: 150,
-    textAlignVertical: "top",
   },
-  modalButtons: {
+  buttonContainer: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
   },
-  modalButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    marginLeft: 10,
+  button: {
+    borderRadius: 5,
+    padding: 10,
+    elevation: 2,
+    minWidth: "45%",
+    alignItems: "center",
   },
   cancelButton: {
     backgroundColor: "#95a5a6",
   },
   saveButton: {
-    backgroundColor: "#3498db",
+    backgroundColor: "#2196F3",
   },
   buttonText: {
     color: "white",
@@ -187,3 +192,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
+
+export default EditNoteModal;

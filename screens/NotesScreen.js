@@ -1,84 +1,89 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import NoteItem from "../components/NoteItem";
 import NoteInput from "../components/NoteInput";
+import { getNotes } from "../services/note-service";
 
-// Sample initial notes data
-const initialNotes = [
-  {
-    id: "1",
-    content: "Learn React Native",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    content: "Complete the tutorial",
-    createdAt: new Date().toISOString(),
-  },
-];
+// Sample initial notes data (will be replaced by Appwrite data)
+const initialNotes = [];
 
 export default function NotesScreen() {
   const [notes, setNotes] = useState(initialNotes);
   const [modalVisible, setModalVisible] = useState(false);
-  const [noteText, setNoteText] = useState("");
-  const [editingNote, setEditingNote] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Function to add or update a note
-  const saveNote = () => {
-    if (noteText.trim() === "") return;
+  useEffect(() => {
+    fetchNotes();
+  }, []);
 
-    if (editingNote) {
-      // Update existing note
-      setNotes(
-        notes.map((note) =>
-          note.id === editingNote.id
-            ? {
-                ...note,
-                content: noteText,
-                updatedAt: new Date().toISOString(),
-              }
-            : note
-        )
-      );
-      setEditingNote(null);
-    } else {
-      // Add new note
-      const newNote = {
-        id: Date.now().toString(),
-        content: noteText,
-        createdAt: new Date().toISOString(),
-      };
-      setNotes([newNote, ...notes]);
+  // Function to fetch notes from the database
+  const fetchNotes = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      // Call the getNotes service function
+      const fetchedNotes = await getNotes();
+      // Update state with the fetched notes
+      setNotes(fetchedNotes);
+    } catch (err) {
+      console.error("Error fetching notes:", err);
+      setError("Failed to load notes. Please try again.");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setNoteText("");
+  // Add the new note to the state
+  const handleNoteAdded = (newNote) => {
+    setNotes((currentNotes) => [newNote, ...currentNotes]);
     setModalVisible(false);
   };
 
-  // Function to delete a note
-  const deleteNote = (id) => {
-    setNotes(notes.filter((note) => note.id !== id));
+  // Handle note deletion by removing it from state
+  const handleNoteDeleted = (noteId) => {
+    setNotes((currentNotes) =>
+      currentNotes.filter((note) => note.$id !== noteId)
+    );
   };
 
-  // Function to open edit mode
-  const editNote = (note) => {
-    setEditingNote(note);
-    setNoteText(note.content);
-    setModalVisible(true);
+  // Handle note update by updating it in state
+  const handleNoteUpdated = (updatedNote) => {
+    setNotes((currentNotes) =>
+      currentNotes.map((note) =>
+        note.$id === updatedNote.$id ? updatedNote : note
+      )
+    );
   };
 
-  // Function to close the modal
-  const closeModal = () => {
-    setModalVisible(false);
-    setNoteText("");
-    setEditingNote(null);
-  };
+  // Show loading indicator while fetching data
+  if (loading && notes.length === 0) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#3498db" />
+        <Text style={styles.loadingText}>Loading notes...</Text>
+      </View>
+    );
+  }
+
+  // Show error message if there was a problem
+  if (error && notes.length === 0) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchNotes}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -96,10 +101,16 @@ export default function NotesScreen() {
         <FlatList
           data={notes}
           renderItem={({ item }) => (
-            <NoteItem note={item} onEdit={editNote} onDelete={deleteNote} />
+            <NoteItem
+              note={item}
+              onEdit={handleNoteUpdated}
+              onDelete={handleNoteDeleted}
+            />
           )}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.$id}
           contentContainerStyle={styles.notesList}
+          refreshing={loading}
+          onRefresh={fetchNotes}
         />
       ) : (
         <View style={styles.emptyContainer}>
@@ -109,11 +120,8 @@ export default function NotesScreen() {
 
       <NoteInput
         visible={modalVisible}
-        onClose={closeModal}
-        onSave={saveNote}
-        noteText={noteText}
-        setNoteText={setNoteText}
-        isEditing={!!editingNote}
+        onClose={() => setModalVisible(false)}
+        onSave={handleNoteAdded}
       />
     </View>
   );
@@ -163,5 +171,33 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     color: "#7f8c8d",
+  },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#e74c3c",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: "#3498db",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
