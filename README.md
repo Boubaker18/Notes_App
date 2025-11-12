@@ -1,9 +1,12 @@
 # Notes App - React Native with Appwrite Backend
 
-A full-stack notes application built with React Native, Expo, and Appwrite as the backend service.
+A full-stack notes application built with React Native, Expo, and Appwrite as the backend service with complete user authentication.
 
 ## ✨ Features
 
+- ✅ **User Authentication** - Register and login with email/password
+- ✅ **Secure Sessions** - Persistent user sessions with Appwrite
+- ✅ **User-specific Notes** - Each user sees only their own notes
 - ✅ **Full CRUD Operations** with Appwrite backend
 - ✅ Create new notes with title and content
 - ✅ View all notes in a beautiful list
@@ -13,29 +16,43 @@ A full-stack notes application built with React Native, Expo, and Appwrite as th
 - ✅ Loading states and error handling
 - ✅ Beautiful Material Design-inspired UI
 - ✅ Modal-based input interface
-- ✅ Navigation between screens
+- ✅ Navigation between screens with auth protection
 - ✅ Cloud synchronization via Appwrite
+- ✅ Empty state UI for better UX
 
 ## 📁 Project Structure
 
 ```
 NotesApp/
-├── App.js                    # Main app with navigation setup
+├── App.js                    # Root component with AuthProvider
+├── src/
+│   ├── services/
+│   │   ├── auth-service.js       # Authentication logic (login, register, logout)
+│   │   ├── appwrite-config.js    # Appwrite client configuration
+│   │   ├── database-service.js   # Database operations service
+│   │   └── note-service.js       # Note CRUD with userId filtering
+│   ├── contexts/
+│   │   └── AuthContext.js        # Global auth state management
+│   ├── navigation/
+│   │   └── AuthNavigator.js      # Route management based on auth status
+│   ├── screens/
+│   │   └── AuthScreen.js         # Login/Register UI
+│   └── components/
+│       └── LogoutButton.js       # Logout functionality
 ├── screens/
-│   ├── HomeScreen.js        # Welcome screen
-│   └── NotesScreen.js       # Main notes screen with CRUD operations
+│   ├── HomeScreen.js        # Welcome screen with auth check
+│   └── NotesScreen.js       # Main notes screen with user filtering
 ├── components/
 │   ├── NoteItem.js          # Reusable note item component
-│   ├── NoteInput.js         # Reusable note input modal component
+│   ├── NoteInput.js         # Reusable note input modal with auth
 │   └── EditNoteModal.js     # Modal for editing notes
-├── services/
-│   ├── appwrite-config.js   # Appwrite client configuration
-│   ├── database-service.js  # Database operations service
-│   └── note-service.js      # Note-specific CRUD operations
 ├── assets/                   # Static assets (images, icons)
 ├── .env                      # Environment variables (not in git)
 ├── .env.example             # Example environment variables
 ├── babel.config.js          # Babel configuration for env variables
+├── AUTHENTICATION_SETUP.md  # Authentication setup guide
+├── APPWRITE_SETUP.md        # Appwrite backend setup guide
+├── QUICK_START.md           # Quick start guide
 ├── package.json             # Project dependencies
 └── app.json                 # Expo configuration
 ```
@@ -44,17 +61,18 @@ NotesApp/
 
 ### Frontend
 - **React Native** - Cross-platform mobile framework
-- **Expo** - Development toolchain and services
+- **Expo** (SDK 54) - Development toolchain and services
 - **React Navigation** - Navigation library
   - @react-navigation/native
-  - @react-navigation/stack
+  - @react-navigation/native-stack
   - react-native-screens
   - react-native-safe-area-context
-  - react-native-gesture-handler
 
 ### Backend
 - **Appwrite** - Open-source backend server
+  - Authentication (Email/Password)
   - Database for notes storage
+  - User session management
   - Real-time capabilities
   - Scalable cloud infrastructure
 
@@ -88,14 +106,16 @@ npm install
 
 3. **Configure Appwrite** (IMPORTANT):
 
-See detailed setup instructions in [APPWRITE_SETUP.md](./APPWRITE_SETUP.md)
+See detailed setup instructions in [APPWRITE_SETUP.md](./APPWRITE_SETUP.md) and [AUTHENTICATION_SETUP.md](./AUTHENTICATION_SETUP.md)
 
 Quick steps:
 - Create an Appwrite account at [https://cloud.appwrite.io/](https://cloud.appwrite.io/)
 - Create a project called "NotesApp"
+- Enable Email/Password authentication in Auth settings
 - Create a database called "NotesDB"
 - Create a collection called "notes" with attributes: `title`, `content`, `userId`, `createdAt`, `updatedAt`
-- Copy `.env` file and add your Appwrite credentials:
+- Set collection permissions for authenticated users
+- Copy `.env.example` to `.env` and add your Appwrite credentials:
 
 ```env
 APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
@@ -137,40 +157,73 @@ Press 'i' in the terminal
 - Components (View, Text, TouchableOpacity, FlatList, Modal, TextInput)
 - StyleSheet and styling
 - Flexbox layout
-- State management with useState hooks
+- State management with useState and useContext hooks
+- Side effects with useEffect
+
+### Authentication
+- User registration and login
+- Session management with Appwrite
+- Protected routes based on auth status
+- Context API for global auth state
+- Secure credential handling
 
 ### Navigation
 - Stack Navigator setup
 - Screen configuration
 - Passing navigation props
 - Navigating between screens
+- Conditional navigation based on auth status
+- Auth flow implementation
 
 ### Component Architecture
 - Functional components
 - Props and callbacks
 - Component composition
 - Separation of concerns
+- Context consumers
+- Custom hooks (useAuth)
 
-### CRUD Operations
-- Create: Add new notes
-- Read: Display notes in a list
+### CRUD Operations with User Filtering
+- Create: Add new notes linked to user
+- Read: Display only user's notes
 - Update: Edit existing notes
 - Delete: Remove notes
+- Filter by userId in database queries
 
 ## Code Highlights
 
 ### Component Refactoring
 The app demonstrates good practices by extracting reusable components:
 - `NoteItem` - Displays individual note with edit/delete actions
-- `NoteInput` - Modal for creating/editing notes
+- `NoteInput` - Modal for creating notes with auth integration
+- `EditNoteModal` - Modal for editing existing notes
+- `LogoutButton` - Reusable logout functionality
+- `AuthNavigator` - Conditional navigation based on auth state
 
 ### State Management
-Uses React hooks for local state:
+Uses React hooks and Context API for state:
 ```javascript
-const [notes, setNotes] = useState(initialNotes);
+// Local state
+const [notes, setNotes] = useState([]);
 const [modalVisible, setModalVisible] = useState(false);
-const [noteText, setNoteText] = useState("");
-const [editingNote, setEditingNote] = useState(null);
+
+// Global auth state with Context
+const { user, isAuthenticated, login, register, logout } = useAuth();
+```
+
+### Authentication Flow
+```javascript
+// Check auth status on app load
+useEffect(() => {
+  const checkUserStatus = async () => {
+    const currentUser = await authService.getCurrentUser();
+    setUser(currentUser);
+  };
+  checkUserStatus();
+}, []);
+
+// Conditional rendering based on auth
+return isAuthenticated ? <AppStack /> : <AuthStack />;
 ```
 
 ### Efficient List Rendering

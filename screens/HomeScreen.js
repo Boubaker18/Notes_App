@@ -1,7 +1,34 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { useAuth } from "../src/contexts/AuthContext";
+import LogoutButton from "../src/components/LogoutButton";
 
 export default function HomeScreen({ navigation }) {
+  const { user, isAuthenticated, loading } = useAuth();
+
+  // Redirect unauthenticated users to Auth screen
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      navigation.replace('Auth');
+    }
+  }, [isAuthenticated, loading, navigation]);
+
+  // Add LogoutButton to navigation header
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <LogoutButton navigation={navigation} />,
+    });
+  }, [navigation]);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3498db" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -9,7 +36,9 @@ export default function HomeScreen({ navigation }) {
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.welcomeText}>Welcome to Notes App</Text>
+        <Text style={styles.welcomeText}>
+          Welcome, {user?.name || 'User'}! 👋
+        </Text>
         <Text style={styles.instructionText}>
           Keep your ideas, lists, and reminders in one place
         </Text>
@@ -18,7 +47,7 @@ export default function HomeScreen({ navigation }) {
           style={styles.notesButton}
           onPress={() => navigation.navigate("Notes")}
         >
-          <Text style={styles.buttonText}>Go to Notes</Text>
+          <Text style={styles.buttonText}>View My Notes</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -29,6 +58,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f5f5",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
   },
   header: {
     height: 100,

@@ -6,8 +6,10 @@ import {
   Modal,
   TextInput,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import { createNote } from "../services/note-service";
+import { useAuth } from "../src/contexts/AuthContext";
 
 export default function NoteInput({
   visible,
@@ -21,6 +23,8 @@ export default function NoteInput({
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  const { user } = useAuth();
 
   // Reset form state
   const resetForm = () => {
@@ -43,15 +47,20 @@ export default function NoteInput({
       return;
     }
 
+    if (!user) {
+      setError("You must be logged in to create notes");
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
-      // Prepare note data
+      // Prepare note data with authenticated user's ID
       const noteData = {
         title: title.trim(),
         content: content.trim(),
-        userId: "demo-user", // Temporary userId, will be replaced with auth
+        userId: user.$id,
       };
 
       // Call create note service

@@ -6,31 +6,44 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import NoteItem from "../components/NoteItem";
 import NoteInput from "../components/NoteInput";
 import { getNotes } from "../services/note-service";
+import { useAuth } from "../src/contexts/AuthContext";
 
-// Sample initial notes data (will be replaced by Appwrite data)
-const initialNotes = [];
-
-export default function NotesScreen() {
-  const [notes, setNotes] = useState(initialNotes);
+export default function NotesScreen({ navigation }) {
+  const [notes, setNotes] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  const { user, isAuthenticated } = useAuth();
+
+  // Redirect to Auth if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigation.replace('Auth');
+    }
+  }, [isAuthenticated, navigation]);
 
   useEffect(() => {
-    fetchNotes();
-  }, []);
+    if (user) {
+      fetchNotes();
+    }
+  }, [user]);
 
   // Function to fetch notes from the database
   const fetchNotes = async () => {
+    if (!user) return;
+    
     try {
       setLoading(true);
       setError(null);
-      // Call the getNotes service function
-      const fetchedNotes = await getNotes();
+      // Call the getNotes service function with userId
+      const fetchedNotes = await getNotes(user.$id);
       // Update state with the fetched notes
       setNotes(fetchedNotes);
     } catch (err) {
@@ -39,6 +52,13 @@ export default function NotesScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Pull to refresh handler
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchNotes();
+    setRefreshing(false);
   };
 
   // Add the new note to the state
@@ -109,12 +129,22 @@ export default function NotesScreen() {
           )}
           keyExtractor={(item) => item.$id}
           contentContainerStyle={styles.notesList}
-          refreshing={loading}
-          onRefresh={fetchNotes}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#3498db']}
+              tintColor="#3498db"
+            />
+          }
         />
       ) : (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No notes yet. Create one!</Text>
+          <Text style={styles.emptyIcon}>📝</Text>
+          <Text style={styles.emptyText}>You don't have any notes yet.</Text>
+          <Text style={styles.emptySubtext}>
+            Tap the + button to create your first note!
+          </Text>
         </View>
       )}
 
@@ -167,10 +197,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    padding: 20,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 20,
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2c3e50",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  emptySubtext: {
+    fontSize: 16,
     color: "#7f8c8d",
+    textAlign: "center",
   },
   centered: {
     flex: 1,
